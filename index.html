@@ -67,7 +67,8 @@
             background: url('pickup_bg.png') center/cover no-repeat fixed;
             z-index: -1;
             pointer-events: none;
-            animation: photoFlashRotate 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0; /* 初始隐藏 */
+            animation: photoFlashRotate 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
         }
         
         /* 拍照闪光+旋转动画 - 柔化版本 */
@@ -114,7 +115,7 @@
             text-align: center;
             position: relative;
             z-index: 10;
-            animation: cardFocusIn 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) 1.5s backwards;
+            animation: cardFocusIn 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) 1.5s backwards; /* 改回 1.5s */
             border: 1px solid rgba(135, 206, 250, 0.4); /* 改为天蓝色边框 */
             overflow: hidden;
         }
@@ -208,7 +209,7 @@
             box-shadow: 0 10px 30px rgba(107, 140, 197, 0.08),
                         0 1px 0 0 rgba(255, 255, 255, 0.8) inset; /* 顶部内发光 */
             transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-            animation: cardSlideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 1.7s backwards;
+            animation: cardSlideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 1.7s backwards; /* 改回 1.7s */
             border: 1px solid rgba(107, 140, 197, 0.3); /* 改为静谧蓝边框 */
             overflow: hidden;
         }
@@ -446,7 +447,7 @@
             margin-top: 35px;
             padding-top: 20px;
             border-top: 1px solid rgba(107, 140, 197, 0.1); /* 极淡的蓝色分割线 */
-            animation: fadeIn 0.8s ease-out 2.3s backwards;
+            animation: fadeIn 0.8s ease-out 2.3s backwards; /* 改回 2.3s */
         }
         
         .history-list {
@@ -502,7 +503,7 @@
             margin-top: 40px; 
             font-size: 12px; 
             color: #A0AEC0;
-            animation: fadeIn 0.8s ease-out 2.5s backwards;
+            animation: fadeIn 0.8s ease-out 2.5s backwards; /* 改回 2.5s */
         }
         .footer a { 
             color: #718096;
