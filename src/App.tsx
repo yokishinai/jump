@@ -11,30 +11,40 @@ function MusicPlayer() {
 
   // 自动扫描 music 文件夹中的所有音频文件
   useEffect(() => {
-    // 使用 Vite 的 glob 导入功能自动获取所有音频文件
-    const musicModules = import.meta.glob('/music/*.{mp3,wav,ogg,m4a,flac}', { 
-      query: '?url', 
-      import: 'default' 
-    });
-    const musicFiles = Object.keys(musicModules);
-    
-    if (musicFiles.length === 0) {
-      console.warn('music 文件夹中没有找到音频文件');
-      return;
-    }
-
-    // Fisher-Yates 洗牌算法生成随机播放列表
-    const shuffleArray = (array: string[]) => {
-      const shuffled = [...array];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    const loadMusicFiles = async () => {
+      // 使用 Vite 的 glob 导入功能自动获取所有音频文件
+      const musicModules = import.meta.glob('/music/*.{mp3,wav,ogg,m4a,flac}', { 
+        query: '?url', 
+        import: 'default',
+        eager: true
+      });
+      const musicFiles = Object.values(musicModules) as string[];
+      
+      if (musicFiles.length === 0) {
+        console.warn('music 文件夹中没有找到音频文件');
+        return;
       }
-      return shuffled;
-    };
 
-    playlistRef.current = shuffleArray(musicFiles);
-    console.log('随机播放列表:', playlistRef.current);
+      // Fisher-Yates 洗牌算法生成随机播放列表
+      const shuffleArray = (array: string[]) => {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+      };
+
+      playlistRef.current = shuffleArray(musicFiles);
+      console.log('随机播放列表:', playlistRef.current);
+      
+      // 设置初始音频源
+      if (audioRef.current && playlistRef.current.length > 0) {
+        audioRef.current.src = playlistRef.current[0];
+      }
+    };
+    
+    loadMusicFiles();
   }, []);
 
   // 播放下一首
@@ -76,8 +86,8 @@ function MusicPlayer() {
         document.removeEventListener('keydown', handleFirstInteraction, true);
         
         // 开始播放
+        audioRef.current.volume = 0.3; // 设置音量为 30%
         audioRef.current.muted = true;
-        audioRef.current.volume = 0.3; // 设置音量为 30%（0.0 到 1.0 之间）
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise
