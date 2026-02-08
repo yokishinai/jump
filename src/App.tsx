@@ -1,6 +1,163 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import React from "react";
 
+// Music Player Component
+function MusicPlayer() {
+  const [isMuted, setIsMuted] = useState(true);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const hasStartedRef = useRef(false);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const playlistRef = useRef<string[]>([]);
+
+  // 自动扫描 music 文件夹中的所有音频文件
+  useEffect(() => {
+    // 使用 Vite 的 glob 导入功能自动获取所有音频文件
+    const musicModules = import.meta.glob('/music/*.{mp3,wav,ogg,m4a,flac}', { 
+      query: '?url', 
+      import: 'default' 
+    });
+    const musicFiles = Object.keys(musicModules);
+    
+    if (musicFiles.length === 0) {
+      console.warn('music 文件夹中没有找到音频文件');
+      return;
+    }
+
+    // Fisher-Yates 洗牌算法生成随机播放列表
+    const shuffleArray = (array: string[]) => {
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    };
+
+    playlistRef.current = shuffleArray(musicFiles);
+    console.log('随机播放列表:', playlistRef.current);
+  }, []);
+
+  // 播放下一首
+  const playNextTrack = useCallback(() => {
+    if (playlistRef.current.length === 0) return;
+    
+    const nextIndex = (currentTrackIndex + 1) % playlistRef.current.length;
+    setCurrentTrackIndex(nextIndex);
+    
+    if (audioRef.current) {
+      audioRef.current.src = playlistRef.current[nextIndex];
+      audioRef.current.load();
+      audioRef.current.play().catch((err) => {
+        console.log('播放下一首失败:', err);
+      });
+    }
+  }, [currentTrackIndex]);
+
+  // 监听音频结束事件，自动播放下一首
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.addEventListener('ended', playNextTrack);
+      return () => {
+        audio.removeEventListener('ended', playNextTrack);
+      };
+    }
+  }, [playNextTrack]);
+
+  useEffect(() => {
+    // 监听用户的首次点击或触摸交互
+    const handleFirstInteraction = () => {
+      if (audioRef.current && !hasStartedRef.current && playlistRef.current.length > 0) {
+        hasStartedRef.current = true; // 立即设置为 true，防止重复触发
+        
+        // 立即移除所有事件监听器
+        document.removeEventListener('click', handleFirstInteraction, true);
+        document.removeEventListener('touchstart', handleFirstInteraction, true);
+        document.removeEventListener('keydown', handleFirstInteraction, true);
+        
+        // 开始播放
+        audioRef.current.muted = true;
+        audioRef.current.volume = 0.3; // 设置音量为 30%（0.0 到 1.0 之间）
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              // 静音播放0.1秒后自动取消静音
+              setTimeout(() => {
+                if (audioRef.current) {
+                  audioRef.current.muted = false;
+                  setIsMuted(false);
+                }
+              }, 100);
+            })
+            .catch((err) => {
+              console.log("播放失败:", err);
+              hasStartedRef.current = false; // 如果失败，允许重试
+            });
+        }
+      }
+    };
+
+    // 只监听点击、触摸和按键事件（这些是浏览器认可的用户交互）
+    document.addEventListener('click', handleFirstInteraction, { capture: true });
+    document.addEventListener('touchstart', handleFirstInteraction, { capture: true });
+    document.addEventListener('keydown', handleFirstInteraction, { capture: true });
+
+    return () => {
+      // 清理所有事件监听器
+      document.removeEventListener('click', handleFirstInteraction, true);
+      document.removeEventListener('touchstart', handleFirstInteraction, true);
+      document.removeEventListener('keydown', handleFirstInteraction, true);
+    };
+  }, []);
+
+  const toggleMute = () => {
+    if (audioRef.current && playlistRef.current.length > 0) {
+      // 如果还没开始播放，先尝试播放
+      if (!hasStartedRef.current) {
+        audioRef.current.muted = false;
+        audioRef.current.play().then(() => {
+          hasStartedRef.current = true;
+          setIsMuted(false);
+        }).catch(() => {
+          console.log("播放失败");
+        });
+      } else {
+        // 已经在播放，只切换静音状态
+        const newMutedState = !isMuted;
+        audioRef.current.muted = newMutedState;
+        setIsMuted(newMutedState);
+      }
+    }
+  };
+
+  return (
+    <>
+      <audio ref={audioRef} src={playlistRef.current[currentTrackIndex]}>
+        <source type="audio/mpeg" />
+      </audio>
+      
+      <button
+        className="music-player playing"
+        onClick={toggleMute}
+        aria-label={isMuted ? "开启音乐" : "静音"}
+      >
+        {isMuted ? (
+          // 静音图标 - music_off
+          <svg className="music-icon rotating" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M4.27 3L3 4.27l9 9v.28c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4v-1.73L19.73 21 21 19.73 4.27 3zM14 7h4V3h-6v5.18l2 2z"/>
+          </svg>
+        ) : (
+          // 有声音图标 - music_note
+          <svg className="music-icon rotating" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+        )}
+      </button>
+    </>
+  );
+}
+
 // Floating particle component
 const Particles = React.memo(function Particles() {
   const particles = Array.from({ length: 15 }, (_, i) => {
@@ -173,6 +330,9 @@ export function App() {
 
   return (
     <>
+      {/* Music Player */}
+      <MusicPlayer />
+
       {/* Decorative background orbs */}
       <div className="orb orb-1" />
       <div className="orb orb-2" />
