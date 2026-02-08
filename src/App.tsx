@@ -152,21 +152,36 @@ export function App() {
   // Add a subtle mouse-follow glow effect
   const containerRef = useRef<HTMLDivElement>(null);
   const [glowPos, setGlowPos] = useState({ x: 50, y: 50 });
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const x = ((e.clientX - rect.left) / rect.width) * 100;
-        const y = ((e.clientY - rect.top) / rect.height) * 100;
-        setGlowPos({ x, y });
+        // 使用 requestAnimationFrame 节流
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
+        }
+        
+        rafRef.current = requestAnimationFrame(() => {
+          if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            setGlowPos({ x, y });
+          }
+        });
       }
     };
 
     const el = containerRef.current;
     if (el) {
       el.addEventListener("mousemove", handleMouseMove);
-      return () => el.removeEventListener("mousemove", handleMouseMove);
+      return () => {
+        el.removeEventListener("mousemove", handleMouseMove);
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
+        }
+      };
     }
   }, []);
 
