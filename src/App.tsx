@@ -8,6 +8,7 @@ function MusicPlayer() {
   const hasStartedRef = useRef(false);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const playlistRef = useRef<string[]>([]);
+  const musicModulesRef = useRef<Record<string, () => Promise<unknown>>>({});
   const [showPanel, setShowPanel] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -17,18 +18,22 @@ function MusicPlayer() {
   const volumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 音量延迟关闭定时器
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 自动扫描 music 文件夹中的所有音频文件
+  // 自动扫描 music 文件夹中的所有音频文件（懒加载）
   useEffect(() => {
     const loadMusicFiles = async () => {
       // 使用 Vite 的 glob 导入功能自动获取所有音频文件
-      const musicModules = import.meta.glob('../music/*.{mp3,wav,ogg,m4a,flac}', { 
+      const musicModules = import.meta.glob('/music/*.{mp3,wav,ogg,m4a,flac}', { 
         query: '?url', 
         import: 'default',
-        eager: true
+        eager: false  // 懒加载，不会一次性加载所有文件
       });
-      const musicFiles = Object.values(musicModules) as string[];
       
-      if (musicFiles.length === 0) {
+      // 保存 musicModules 供后续使用
+      musicModulesRef.current = musicModules;
+      
+      const musicPaths = Object.keys(musicModules);
+      
+      if (musicPaths.length === 0) {
         console.warn('music 文件夹中没有找到音频文件');
         return;
       }
@@ -43,12 +48,13 @@ function MusicPlayer() {
         return shuffled;
       };
 
-      playlistRef.current = shuffleArray(musicFiles);
+      playlistRef.current = shuffleArray(musicPaths);
       console.log('随机播放列表:', playlistRef.current);
       
-      // 设置初始音频源
+      // 懒加载第一首音乐
       if (audioRef.current && playlistRef.current.length > 0) {
-        audioRef.current.src = playlistRef.current[0];
+        const firstModule = await musicModules[playlistRef.current[0]]();
+        audioRef.current.src = firstModule as string;
       }
     };
     
@@ -79,15 +85,19 @@ function MusicPlayer() {
   }, []);
 
   // 播放下一首
-  const playNextTrack = useCallback(() => {
+  const playNextTrack = useCallback(async () => {
     if (playlistRef.current.length === 0) return;
     
     const nextIndex = (currentTrackIndex + 1) % playlistRef.current.length;
     setCurrentTrackIndex(nextIndex);
     
-    if (audioRef.current) {
+    if (audioRef.current && musicModulesRef.current) {
       const audio = audioRef.current;
-      audio.src = playlistRef.current[nextIndex];
+      const trackPath = playlistRef.current[nextIndex];
+      
+      // 懒加载音乐文件
+      const trackModule = await musicModulesRef.current[trackPath]();
+      audio.src = trackModule as string;
       
       // 直接播放，不等待完全加载
       const playPromise = audio.play();
@@ -104,15 +114,19 @@ function MusicPlayer() {
   }, [currentTrackIndex]);
 
   // 播放上一首
-  const playPrevTrack = useCallback(() => {
+  const playPrevTrack = useCallback(async () => {
     if (playlistRef.current.length === 0) return;
     
     const prevIndex = (currentTrackIndex - 1 + playlistRef.current.length) % playlistRef.current.length;
     setCurrentTrackIndex(prevIndex);
     
-    if (audioRef.current) {
+    if (audioRef.current && musicModulesRef.current) {
       const audio = audioRef.current;
-      audio.src = playlistRef.current[prevIndex];
+      const trackPath = playlistRef.current[prevIndex];
+      
+      // 懒加载音乐文件
+      const trackModule = await musicModulesRef.current[trackPath]();
+      audio.src = trackModule as string;
       
       const playPromise = audio.play();
       if (playPromise !== undefined) {
@@ -153,11 +167,15 @@ function MusicPlayer() {
   };
 
   // 切换到指定曲目
-  const playTrack = (index: number) => {
-    if (audioRef.current && playlistRef.current[index]) {
+  const playTrack = async (index: number) => {
+    if (audioRef.current && playlistRef.current[index] && musicModulesRef.current) {
       setCurrentTrackIndex(index);
       const audio = audioRef.current;
-      audio.src = playlistRef.current[index];
+      const trackPath = playlistRef.current[index];
+      
+      // 懒加载音乐文件
+      const trackModule = await musicModulesRef.current[trackPath]();
+      audio.src = trackModule as string;
       
       const playPromise = audio.play();
       if (playPromise !== undefined) {

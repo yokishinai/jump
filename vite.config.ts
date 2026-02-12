@@ -10,8 +10,8 @@ const __dirname = path.dirname(__filename);
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/jump/',  // 替换为你的仓库名
-  plugins: [react(), tailwindcss(), viteSingleFile()],
+  base: '/jump/',
+  plugins: [react(), tailwindcss()], // 移除 viteSingleFile()
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
