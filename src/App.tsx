@@ -8,53 +8,47 @@ function MusicPlayer() {
   const hasStartedRef = useRef(false);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const playlistRef = useRef<string[]>([]);
-  const musicModulesRef = useRef<Record<string, () => Promise<unknown>>>({});
   const [showPanel, setShowPanel] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.3); // 添加音量状态
-  const [showVolumeSlider, setShowVolumeSlider] = useState(false); // 音量滑块显示状态
-  const volumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 音量延迟关闭定时器
+  const [volume, setVolume] = useState(0.3);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const volumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 自动扫描 music 文件夹中的所有音频文件（懒加载）
+  // 自动加载音乐列表
   useEffect(() => {
     const loadMusicFiles = async () => {
-      // 使用 Vite 的 glob 导入功能自动获取所有音频文件
-      const musicModules = import.meta.glob('/music/*.{mp3,wav,ogg,m4a,flac}', { 
-        query: '?url', 
-        import: 'default',
-        eager: false  // 懒加载，不会一次性加载所有文件
-      });
-      
-      // 保存 musicModules 供后续使用
-      musicModulesRef.current = musicModules;
-      
-      const musicPaths = Object.keys(musicModules);
-      
-      if (musicPaths.length === 0) {
-        console.warn('music 文件夹中没有找到音频文件');
-        return;
-      }
-
-      // Fisher-Yates 洗牌算法生成随机播放列表
-      const shuffleArray = (array: string[]) => {
-        const shuffled = [...array];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      try {
+        // 从自动生成的 JSON 文件加载音乐列表
+        const response = await fetch('./musicList.json');
+        const musicFiles = await response.json();
+        
+        if (musicFiles.length === 0) {
+          console.warn('music 文件夹中没有找到音频文件');
+          return;
         }
-        return shuffled;
-      };
 
-      playlistRef.current = shuffleArray(musicPaths);
-      console.log('随机播放列表:', playlistRef.current);
-      
-      // 懒加载第一首音乐
-      if (audioRef.current && playlistRef.current.length > 0) {
-        const firstModule = await musicModules[playlistRef.current[0]]();
-        audioRef.current.src = firstModule as string;
+        // Fisher-Yates 洗牌算法生成随机播放列表
+        const shuffleArray = (array: string[]) => {
+          const shuffled = [...array];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          return shuffled;
+        };
+
+        playlistRef.current = shuffleArray(musicFiles);
+        console.log('随机播放列表:', playlistRef.current);
+        
+        // 设置第一首音乐
+        if (audioRef.current && playlistRef.current.length > 0) {
+          audioRef.current.src = playlistRef.current[0];
+        }
+      } catch (error) {
+        console.error('加载音乐列表失败:', error);
       }
     };
     
@@ -85,25 +79,19 @@ function MusicPlayer() {
   }, []);
 
   // 播放下一首
-  const playNextTrack = useCallback(async () => {
+  const playNextTrack = useCallback(() => {
     if (playlistRef.current.length === 0) return;
     
     const nextIndex = (currentTrackIndex + 1) % playlistRef.current.length;
     setCurrentTrackIndex(nextIndex);
     
-    if (audioRef.current && musicModulesRef.current) {
+    if (audioRef.current) {
       const audio = audioRef.current;
-      const trackPath = playlistRef.current[nextIndex];
+      audio.src = playlistRef.current[nextIndex];
       
-      // 懒加载音乐文件
-      const trackModule = await musicModulesRef.current[trackPath]();
-      audio.src = trackModule as string;
-      
-      // 直接播放，不等待完全加载
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
-          // 如果直接播放失败，等待一下再试
           console.log('播放下一首失败，尝试重新播放:', err);
           setTimeout(() => {
             audio.play().catch(e => console.log('重试播放失败:', e));
@@ -114,19 +102,15 @@ function MusicPlayer() {
   }, [currentTrackIndex]);
 
   // 播放上一首
-  const playPrevTrack = useCallback(async () => {
+  const playPrevTrack = useCallback(() => {
     if (playlistRef.current.length === 0) return;
     
     const prevIndex = (currentTrackIndex - 1 + playlistRef.current.length) % playlistRef.current.length;
     setCurrentTrackIndex(prevIndex);
     
-    if (audioRef.current && musicModulesRef.current) {
+    if (audioRef.current) {
       const audio = audioRef.current;
-      const trackPath = playlistRef.current[prevIndex];
-      
-      // 懒加载音乐文件
-      const trackModule = await musicModulesRef.current[trackPath]();
-      audio.src = trackModule as string;
+      audio.src = playlistRef.current[prevIndex];
       
       const playPromise = audio.play();
       if (playPromise !== undefined) {
@@ -167,15 +151,11 @@ function MusicPlayer() {
   };
 
   // 切换到指定曲目
-  const playTrack = async (index: number) => {
-    if (audioRef.current && playlistRef.current[index] && musicModulesRef.current) {
+  const playTrack = (index: number) => {
+    if (audioRef.current && playlistRef.current[index]) {
       setCurrentTrackIndex(index);
       const audio = audioRef.current;
-      const trackPath = playlistRef.current[index];
-      
-      // 懒加载音乐文件
-      const trackModule = await musicModulesRef.current[trackPath]();
-      audio.src = trackModule as string;
+      audio.src = playlistRef.current[index];
       
       const playPromise = audio.play();
       if (playPromise !== undefined) {

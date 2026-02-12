@@ -5,6 +5,9 @@ node_modules/
 dist/
 dist-ssr/
 
+# Auto-generated files
+public/musicList.json
+
 # Logs
 *.log
 npm-debug.log*
