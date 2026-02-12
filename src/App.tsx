@@ -21,7 +21,7 @@ function MusicPlayer() {
   useEffect(() => {
     const loadMusicFiles = async () => {
       // 使用 Vite 的 glob 导入功能自动获取所有音频文件
-      const musicModules = import.meta.glob('/music/*.{mp3,wav,ogg,m4a,flac}', { 
+      const musicModules = import.meta.glob('../music/*.{mp3,wav,ogg,m4a,flac}', { 
         query: '?url', 
         import: 'default',
         eager: true
